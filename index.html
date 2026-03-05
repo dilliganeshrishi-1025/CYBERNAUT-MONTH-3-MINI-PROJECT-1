@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chatbot Management System</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
+        .container { display: flex; height: 100vh; }
+        .sidebar { width: 250px; background: #2c3e50; color: white; padding: 20px; overflow-y: auto; }
+        .main { flex: 1; display: flex; flex-direction: column; }
+        .header { background: #34495e; color: white; padding: 20px; }
+        .content { flex: 1; display: flex; overflow: hidden; }
+        .chatbot-list { width: 300px; background: white; border-right: 1px solid #ddd; overflow-y: auto; padding: 15px; }
+        .chat-area { flex: 1; display: flex; flex-direction: column; background: white; }
+        .messages { flex: 1; overflow-y: auto; padding: 20px; }
+        .message { margin: 10px 0; padding: 10px 15px; border-radius: 8px; max-width: 70%; }
+        .user-msg { background: #3498db; color: white; margin-left: auto; }
+        .bot-msg { background: #ecf0f1; color: #333; }
+        .input-area { padding: 20px; border-top: 1px solid #ddd; display: flex; gap: 10px; }
+        .input-area input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+        .input-area button { padding: 10px 20px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .btn { padding: 10px 15px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 10px; width: 100%; }
+        .chatbot-item { padding: 10px; background: #f9f9f9; border: 1px solid #ddd; margin-bottom: 10px; cursor: pointer; border-radius: 4px; color: #333; }
+        .chatbot-item.active { background: #3498db; color: white; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+        .modal.show { display: flex; }
+        .modal-content { background: white; padding: 30px; border-radius: 8px; width: 400px; }
+        .modal-content h2 { margin-bottom: 20px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group input, .form-group textarea { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        .form-actions { display: flex; gap: 10px; }
+        .form-actions button { flex: 1; padding: 10px; border: none; border-radius: 4px; cursor: pointer; }
+        .btn-primary { background: #3498db; color: white; }
+        .btn-secondary { background: #95a5a6; color: white; }
+        h2 { font-size: 18px; margin-bottom: 15px; }
+        .tab-buttons { display: flex; gap: 10px; margin-bottom: 15px; }
+        .tab-btn { padding: 8px 15px; background: #ecf0f1; border: none; cursor: pointer; border-radius: 4px; }
+        .tab-btn.active { background: #3498db; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <h2 style="color: white; margin-bottom: 20px;">ChatBot Manager</h2>
+            <button class="btn btn-primary" onclick="openCreateModal()">+ New Chatbot</button>
+            <button class="btn btn-primary" onclick="showTrainingTab()">Train Bot</button>
+            <button class="btn btn-primary" onclick="showAnalyticsTab()">Analytics</button>
+            <h3 style="margin-top: 20px; color: #bdc3c7;">Your Chatbots</h3>
+            <div id="sidebar-list"></div>
+        </div>
+
+        <div class="main">
+            <div class="header">
+                <h1>AI Chatbot Management System</h1>
+                <p id="chatbot-title">Select a chatbot to start</p>
+            </div>
+
+            <div class="content">
+                <div id="chat-panel" style="flex: 1; display: flex; flex-direction: column;">
+                    <div class="messages" id="messages"></div>
+                    <div class="input-area">
+                        <input type="text" id="message-input" placeholder="Type your message..." onkeypress="handleKeyPress(event)">
+                        <button onclick="sendMessage()">Send</button>
+                    </div>
+                </div>
+
+                <div id="training-panel" style="flex: 1; padding: 20px; display: none; overflow-y: auto;">
+                    <h2>Train Chatbot</h2>
+                    <div class="form-group">
+                        <label>Intent (e.g., greeting, help):</label>
+                        <input type="text" id="intent-input" placeholder="greeting">
+                    </div>
+                    <div class="form-group">
+                        <label>User Patterns (comma-separated):</label>
+                        <textarea id="patterns-input" rows="4" placeholder="hello, hi, hey, good morning"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Bot Response:</label>
+                        <textarea id="response-input" rows="3" placeholder="Hello! How can I help you today?"></textarea>
+                    </div>
+                    <button class="btn btn-primary" onclick="trainChatbot()">Add Training Data</button>
+                    <h3 style="margin-top:20px;">Existing Training Data</h3>
+                    <div id="training-list"></div>
+                    <div style="margin-top:8px;">
+                        <button id="toggle-debug" style="background:#2c3e50;color:#fff;border:none;padding:6px 8px;border-radius:4px;cursor:pointer;display:none;">Show JSON</button>
+                        <pre id="training-debug" style="display:none;background:#fff;border:1px solid #eee;padding:8px;margin-top:8px;max-height:200px;overflow:auto;font-size:12px;color:#333;"></pre>
+                    </div>
+                </div>
+
+                <div id="analytics-panel" style="flex: 1; padding: 20px; display: none; overflow-y: auto;">
+                    <h2>Chatbot Analytics</h2>
+                    <div style="margin-top: 20px;">
+                        <p><strong>Total Conversations:</strong> <span id="total-conversations">0</span></p>
+                        <p><strong>Total Messages:</strong> <span id="total-messages">0</span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="create-modal" class="modal">
+        <div class="modal-content">
+            <h2>Create New Chatbot</h2>
+            <div class="form-group">
+                <label>Name:</label>
+                <input type="text" id="chatbot-name" placeholder="Customer Support Bot">
+            </div>
+            <div class="form-group">
+                <label>Description:</label>
+                <textarea id="chatbot-desc" rows="3" placeholder="A chatbot for customer support"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Tone:</label>
+                <input type="text" id="chatbot-tone" placeholder="friendly" value="friendly">
+            </div>
+            <div class="form-actions">
+                <button class="btn-primary" onclick="createChatbot()">Create</button>
+                <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:5000';
+        let currentChatbot = null;
+
+        async function loadChatbots() {
+            const res = await fetch(`${API_URL}/api/chatbots`);
+            const chatbots = await res.json();
+            const list = document.getElementById('sidebar-list');
+            list.innerHTML = chatbots.map(bot => `
+                <div class="chatbot-item ${bot.id === currentChatbot ? 'active' : ''}" onclick="selectChatbot(${bot.id}, '${(bot.name||'').replace(/'/g, "\\'")}')">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                        <div style="flex:1">
+                            <strong>${bot.name}</strong>
+                            <p style="font-size: 12px; margin-top: 5px;">${bot.description || 'No description'}</p>
+                        </div>
+                        <div style="display:flex; gap:8px;">
+                            <button style="background:#e74c3c; color:#fff; border:none; padding:6px 8px; border-radius:4px; cursor:pointer;" onclick="deleteChatbot(event, ${bot.id})">Delete</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function deleteChatbot(e, chatbotId) {
+            e.stopPropagation();
+            if (!confirm('Delete this chatbot? This cannot be undone.')) return;
+
+            try {
+                const res = await fetch(`${API_URL}/api/chatbots/${chatbotId}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+                // If deleted chatbot was selected, clear selection
+                if (currentChatbot === chatbotId) {
+                    currentChatbot = null;
+                    document.getElementById('chatbot-title').textContent = 'Select a chatbot to start';
+                    document.getElementById('messages').innerHTML = '';
+                }
+
+                await loadChatbots();
+                alert('Chatbot deleted');
+            } catch (err) {
+                console.error('Delete error:', err);
+                alert('Failed to delete chatbot: ' + err.message);
+            }
+        }
+
+        function selectChatbot(id, name) {
+            currentChatbot = id;
+            document.getElementById('chatbot-title').textContent = `Chatbot: ${name}`;
+            document.getElementById('messages').innerHTML = '';
+            loadChatHistory();
+            loadChatbots();
+            // load training data for this chatbot so training panel shows up-to-date list
+            loadTrainingData();
+        }
+
+        async function createChatbot() {
+            const name = document.getElementById('chatbot-name').value;
+            const description = document.getElementById('chatbot-desc').value;
+            const tone = document.getElementById('chatbot-tone').value;
+
+            if (!name) {
+                alert('Name is required');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/api/chatbots`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, description, tone })
+                });
+
+                if (!res.ok) {
+                    throw new Error(`HTTP error! status: ${res.status}`);
+                }
+
+                const data = await res.json();
+                alert('Chatbot created successfully!');
+                document.getElementById('chatbot-name').value = '';
+                document.getElementById('chatbot-desc').value = '';
+                document.getElementById('chatbot-tone').value = 'friendly';
+                closeModal();
+                loadChatbots();
+            } catch (error) {
+                alert('Error creating chatbot: ' + error.message);
+                console.error('Error:', error);
+            }
+        }
+
+        function openCreateModal() {
+            document.getElementById('create-modal').classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('create-modal').classList.remove('show');
+        }
+
+        async function sendMessage() {
+            if (!currentChatbot) {
+                alert('Please select a chatbot first');
+                return;
+            }
+
+            const input = document.getElementById('message-input');
+            const message = input.value.trim();
+            if (!message) return;
+
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML += `<div class="message user-msg">${message}</div>`;
+            input.value = '';
+
+            const res = await fetch(`${API_URL}/api/chatbots/${currentChatbot}/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message })
+            });
+
+            const data = await res.json();
+            messagesDiv.innerHTML += `<div class="message bot-msg">${data.response}</div>`;
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        async function loadChatHistory() {
+            if (!currentChatbot) return;
+            const res = await fetch(`${API_URL}/api/chatbots/${currentChatbot}/history`);
+            const history = await res.json();
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML = history.map(item => `
+                <div class="message user-msg">${item.user}</div>
+                <div class="message bot-msg">${item.bot}</div>
+            `).join('');
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        async function trainChatbot() {
+            if (!currentChatbot) {
+                alert('Please select a chatbot first');
+                return;
+            }
+
+            const intent = document.getElementById('intent-input').value;
+            const patterns = document.getElementById('patterns-input').value.split(',').map(p => p.trim());
+            const response = document.getElementById('response-input').value;
+
+            if (!intent || !patterns[0] || !response) {
+                alert('All fields are required');
+                return;
+            }
+
+            await fetch(`${API_URL}/api/chatbots/${currentChatbot}/train`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ intent, patterns, response })
+            });
+
+            document.getElementById('intent-input').value = '';
+            document.getElementById('patterns-input').value = '';
+            document.getElementById('response-input').value = '';
+            alert('Training data added!');
+            loadTrainingData();
+        }
+
+        async function loadTrainingData() {
+            const list = document.getElementById('training-list');
+            const debugBtn = document.getElementById('toggle-debug');
+            const debugPre = document.getElementById('training-debug');
+            if (!currentChatbot) {
+                list.innerHTML = '<p style="color:#666;">Select a chatbot to view training data.</p>';
+                if (debugBtn) debugBtn.style.display = 'none';
+                if (debugPre) debugPre.style.display = 'none';
+                return;
+            }
+            try {
+                const res = await fetch(`${API_URL}/api/chatbots/${currentChatbot}/training`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const items = await res.json();
+                if (!items || items.length === 0) {
+                    list.innerHTML = '<p style="color:#666;">No training data yet.</p>';
+                    if (debugBtn) {
+                        debugBtn.style.display = 'inline-block';
+                        debugBtn.textContent = 'Show JSON';
+                        debugBtn.onclick = () => {
+                            if (debugPre.style.display === 'none') {
+                                debugPre.style.display = 'block';
+                                debugPre.textContent = JSON.stringify(items, null, 2);
+                                debugBtn.textContent = 'Hide JSON';
+                            } else {
+                                debugPre.style.display = 'none';
+                                debugBtn.textContent = 'Show JSON';
+                            }
+                        };
+                    }
+                    return;
+                }
+                list.innerHTML = items.map(t => `
+                    <div style="border:1px solid #ddd;padding:8px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;border-radius:4px;background:#fff;">
+                        <div style="flex:1;margin-right:12px;">
+                            <strong style="display:block">${t.intent}</strong>
+                            <div style="font-size:13px;color:#333">${t.pattern}</div>
+                            <div style="font-size:13px;color:#555;margin-top:6px">${t.response}</div>
+                        </div>
+                        <div>
+                            <button style="background:#e74c3c;color:#fff;border:none;padding:6px 8px;border-radius:4px;cursor:pointer;" onclick="deleteTrainingData(${t.id})">Delete</button>
+                        </div>
+                    </div>
+                `).join('');
+                if (debugBtn) {
+                    debugBtn.style.display = 'inline-block';
+                    debugBtn.textContent = 'Show JSON';
+                    debugBtn.onclick = () => {
+                        if (debugPre.style.display === 'none') {
+                            debugPre.style.display = 'block';
+                            debugPre.textContent = JSON.stringify(items, null, 2);
+                            debugBtn.textContent = 'Hide JSON';
+                        } else {
+                            debugPre.style.display = 'none';
+                            debugBtn.textContent = 'Show JSON';
+                        }
+                    };
+                }
+            } catch (err) {
+                console.error('Load training error:', err);
+            }
+        }
+
+        async function deleteTrainingData(trainingId) {
+            if (!confirm('Delete this training item?')) return;
+            try {
+                const res = await fetch(`${API_URL}/api/chatbots/${currentChatbot}/training/${trainingId}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                alert('Training item deleted');
+                loadTrainingData();
+            } catch (err) {
+                console.error('Delete training error:', err);
+                alert('Failed to delete training item: ' + err.message);
+            }
+        }
+
+        async function loadAnalytics() {
+            if (!currentChatbot) return;
+            const res = await fetch(`${API_URL}/api/chatbots/${currentChatbot}/analytics`);
+            const data = await res.json();
+            document.getElementById('total-conversations').textContent = data.total_conversations;
+            document.getElementById('total-messages').textContent = data.total_messages;
+        }
+
+        function showTrainingTab() {
+            document.getElementById('chat-panel').style.display = 'none';
+            document.getElementById('training-panel').style.display = 'block';
+            document.getElementById('analytics-panel').style.display = 'none';
+            loadTrainingData();
+        }
+
+        function showAnalyticsTab() {
+            document.getElementById('chat-panel').style.display = 'none';
+            document.getElementById('training-panel').style.display = 'none';
+            document.getElementById('analytics-panel').style.display = 'block';
+            loadAnalytics();
+        }
+
+        function showChatTab() {
+            document.getElementById('chat-panel').style.display = 'flex';
+            document.getElementById('training-panel').style.display = 'none';
+            document.getElementById('analytics-panel').style.display = 'none';
+        }
+
+        function handleKeyPress(e) {
+            if (e.key === 'Enter') sendMessage();
+        }
+
+        loadChatbots();
+    </script>
+</body>
+</html>
